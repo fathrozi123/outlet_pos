@@ -1,0 +1,24 @@
+name: outlet_pos
+description: Aplikasi kasir outlet (Flutter + SQLite + printer thermal Bluetooth)
+publish_to: "none"
+version: 1.0.0+1
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  intl: ^0.19.0
+  crypto: ^3.0.3
+  print_bluetooth_thermal: ^1.1.4
+  esc_pos_utils_plus: ^2.0.4
+  permission_handler: ^11.3.1
+  image_picker: ^1.1.2
+  path_provider: ^2.1.4
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+flutter:
+  uses-material-design: true
