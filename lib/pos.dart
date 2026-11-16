@@ -203,55 +203,56 @@ class _PosPageState extends State<PosPage> {
         Widget opt(int i) {
           final on = sel == i;
           final habis = availOf(i) == 0;
-          return InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: habis
-                ? null
-                : () => set(() {
-                      sel = i;
-                      qty = 1;
-                    }),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 104,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-              decoration: BoxDecoration(
-                color: on ? cs.primaryContainer : Colors.white,
-                border: Border.all(
-                    color: on ? cs.primary : cs.outlineVariant,
-                    width: on ? 2 : 1),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: on
-                    ? [
-                        BoxShadow(
-                          color: cs.primary.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(children: [
-                Text('${vs[i]['kemasan']}',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: habis ? Colors.grey : null)),
-                const SizedBox(height: 4),
-                Text(rp(vs[i]['price'] as int),
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                        color: habis ? Colors.grey : (on ? cs.primary : null))),
-                if (habis)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Text('Stok habis',
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: habis
+                  ? null
+                  : () => set(() {
+                        sel = i;
+                        qty = 1;
+                      }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: on ? cs.primaryContainer : Colors.white,
+                  border: Border.all(
+                      color: on ? cs.primary : cs.outlineVariant, width: 1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(children: [
+                  Icon(
+                      on
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      size: 24,
+                      color:
+                          habis ? Colors.grey : (on ? cs.primary : cs.outline)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text('${vs[i]['kemasan']}',
                         style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.red,
-                            fontWeight: FontWeight.w700)),
+                            fontSize: 15, color: habis ? Colors.grey : null)),
                   ),
-              ]),
+                  if (habis)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: Text('Stok habis',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.red,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  Text(rp(vs[i]['price'] as int),
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: habis ? Colors.grey : null)),
+                ]),
+              ),
             ),
           );
         }
@@ -262,79 +263,85 @@ class _PosPageState extends State<PosPage> {
           title: Text(p['name'] as String,
               style:
                   const TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
-          content: SingleChildScrollView(
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (plain)
-                    Center(
-                        child: Text(rp(price),
+          content: SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (plain)
+                        Center(
+                            child: Text(rp(price),
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.primary)))
+                      else ...[
+                        const Text('Varian',
                             style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: cs.primary)))
-                  else ...[
-                    const Text('Pilih kemasan',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14)),
-                    const SizedBox(height: 10),
-                    Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [for (var i = 0; i < vs.length; i++) opt(i)]),
-                  ],
-                  const SizedBox(height: 20),
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    IconButton.filledTonal(
-                        style: IconButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12))),
-                        onPressed: qty > 1 ? () => set(() => qty--) : null,
-                        icon: const Icon(Icons.remove)),
-                    SizedBox(
-                        width: 64,
-                        child: Text('$qty',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(c)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w800))),
-                    IconButton.filledTonal(
-                        style: IconButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12))),
-                        onPressed: (availOf(sel) == null || qty < availOf(sel)!)
-                            ? () => set(() => qty++)
-                            : null,
-                        icon: const Icon(Icons.add)),
-                  ]),
-                  const SizedBox(height: 8),
-                  Center(
-                      child: Text('Subtotal ${rp(price * qty)}',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: cs.primary))),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    initialValue: note,
-                    onChanged: (val) => note = val,
-                    maxLength: 80,
-                    maxLines: 2,
-                    minLines: 1,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: 'Catatan (opsional)',
-                      hintText: 'Contoh: level 3, tanpa daun jeruk',
-                      prefixIcon: const Icon(Icons.edit_note_rounded),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                  ),
-                ]),
-          ),
+                                fontWeight: FontWeight.w700, fontSize: 14)),
+                        const SizedBox(height: 10),
+                        for (var i = 0; i < vs.length; i++) opt(i),
+                      ],
+                      const SizedBox(height: 20),
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton.filledTonal(
+                                style: IconButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed:
+                                    qty > 1 ? () => set(() => qty--) : null,
+                                icon: const Icon(Icons.remove)),
+                            SizedBox(
+                                width: 64,
+                                child: Text('$qty',
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(c)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                            fontWeight: FontWeight.w800))),
+                            IconButton.filledTonal(
+                                style: IconButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: (availOf(sel) == null ||
+                                        qty < availOf(sel)!)
+                                    ? () => set(() => qty++)
+                                    : null,
+                                icon: const Icon(Icons.add)),
+                          ]),
+                      const SizedBox(height: 8),
+                      Center(
+                          child: Text('Subtotal ${rp(price * qty)}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                  color: cs.primary))),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        initialValue: note,
+                        onChanged: (val) => note = val,
+                        maxLength: 80,
+                        maxLines: 2,
+                        minLines: 1,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          labelText: 'Catatan (opsional)',
+                          hintText: 'Contoh: level 3, tanpa daun jeruk',
+                          prefixIcon: const Icon(Icons.edit_note_rounded),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ]),
+              )),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
             TextButton(
@@ -1760,7 +1767,11 @@ class _PayDialogState extends State<PayDialog> {
         Wrap(spacing: 8, children: [
           for (final n in [0, 5, 10, 15, 20, 25])
             ActionChip(
-                label: Text('$n%'),
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Colors.red),
+                label: Text('$n%',
+                    style: const TextStyle(
+                        color: Colors.red, fontWeight: FontWeight.w600)),
                 onPressed: () => setState(() => pct.text = '$n')),
         ]),
         Padding(
@@ -1832,7 +1843,11 @@ class _PayDialogState extends State<PayDialog> {
       Wrap(spacing: 8, runSpacing: 4, children: [
         for (final n in _suggest)
           ActionChip(
-              label: Text(rp(n)),
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: Colors.red),
+              label: Text(rp(n),
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w600)),
               onPressed:
                   busy ? null : () => setState(() => cash.text = moneyText(n))),
       ]),
