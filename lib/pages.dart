@@ -539,7 +539,8 @@ class _AccountPageState extends State<AccountPage> {
               onTap: () => Navigator.pop(c, 'gal')),
           if (_hasPhoto)
             ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                leading:
+                    const Icon(Icons.delete_outline, color: Color(0xFF97291F)),
                 title: const Text('Hapus foto profil'),
                 onTap: () => Navigator.pop(c, 'del')),
         ]),

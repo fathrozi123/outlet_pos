@@ -11,6 +11,13 @@ import 'rekapitulasi.dart';
 import 'scope.dart';
 import 'target.dart';
 
+/// Gaya tombol terisi di halaman admin: latar putih, teks merah.
+final _kBtnPutih = FilledButton.styleFrom(
+  backgroundColor: Colors.white,
+  foregroundColor: Color(0xFF97291F),
+  side: const BorderSide(color: Color(0xFF97291F)),
+);
+
 const _periods = {'Harian': 10, 'Bulanan': 7, 'Tahunan': 4};
 String _now(int len) => DateTime.now().toIso8601String().substring(0, len);
 
@@ -43,6 +50,13 @@ class _PeriodBar extends StatelessWidget {
   const _PeriodBar(this.value, this.onChanged);
   @override
   Widget build(BuildContext context) => SegmentedButton<String>(
+        style: SegmentedButton.styleFrom(
+          foregroundColor: Color(0xFF97291F),
+          selectedForegroundColor: Color(0xFF97291F),
+          backgroundColor: Colors.white,
+          selectedBackgroundColor: const Color(0xFFF6E1DF),
+          side: const BorderSide(color: Color(0xFF97291F)),
+        ),
         showSelectedIcon: false,
         segments: [
           for (final k in _periods.keys) ButtonSegment(value: k, label: Text(k))
@@ -124,7 +138,7 @@ class SubscriptionNotice extends StatelessWidget {
           }
           if (warn.isEmpty && ended.isEmpty) return const SizedBox.shrink();
           warn.sort((a, b) => a.value.compareTo(b.value));
-          const merah = Color(0xFFC62828);
+          const merah = Color(0xFF97291F);
           const base = TextStyle(color: merah, height: 1.4);
           Widget bullet(String nama, String ket) => Padding(
                 padding: const EdgeInsets.only(left: 8, top: 2),
@@ -142,7 +156,7 @@ class SubscriptionNotice extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFEBEE),
+                color: const Color(0xFFF9E8E6),
                 border: Border.all(color: merah),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -507,6 +521,9 @@ class _ReportSummaryState extends State<ReportSummary> {
     if (fut == null) _load(); // aman setelah hot reload
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF97291F),
+        shape: const StadiumBorder(side: BorderSide(color: Color(0xFF97291F))),
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: _text));
           if (context.mounted) {
@@ -566,17 +583,37 @@ class _ReportSummaryState extends State<ReportSummary> {
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
                   ActionChip(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF97291F)),
+                      labelStyle: const TextStyle(
+                          color: Color(0xFF97291F),
+                          fontWeight: FontWeight.w600),
                       label: const Text('Hari ini'),
                       onPressed: () => _setRange(now, now)),
                   ActionChip(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF97291F)),
+                      labelStyle: const TextStyle(
+                          color: Color(0xFF97291F),
+                          fontWeight: FontWeight.w600),
                       label: const Text('7 hari'),
                       onPressed: () => _setRange(
                           now.subtract(const Duration(days: 6)), now)),
                   ActionChip(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF97291F)),
+                      labelStyle: const TextStyle(
+                          color: Color(0xFF97291F),
+                          fontWeight: FontWeight.w600),
                       label: const Text('Bulan ini'),
                       onPressed: () =>
                           _setRange(DateTime(now.year, now.month, 1), now)),
                   ActionChip(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF97291F)),
+                      labelStyle: const TextStyle(
+                          color: Color(0xFF97291F),
+                          fontWeight: FontWeight.w600),
                       label: const Text('Tahun ini'),
                       onPressed: () =>
                           _setRange(DateTime(now.year, 1, 1), now)),
@@ -600,20 +637,20 @@ class _ReportSummaryState extends State<ReportSummary> {
                           _sumRow('Penjualan Kotor', rp(kotor)),
                           const Divider(height: 1),
                           _sumRow('Diskon', '-${rp(diskon)}',
-                              color: diskon > 0 ? Colors.red : null),
+                              color: diskon > 0 ? Color(0xFF97291F) : null),
                           const Divider(height: 1),
                           _sumRow('Total Pendapatan Kotor', rp(bersih),
                               bold: true),
                           const Divider(height: 1),
                           _sumRow('Modal', '-${rp(modal)}',
-                              color: modal > 0 ? Colors.red : null),
+                              color: modal > 0 ? Color(0xFF97291F) : null),
                           const Divider(height: 1),
                           _sumRow('Beban', '-${rp(beban)}',
-                              color: beban > 0 ? Colors.red : null),
+                              color: beban > 0 ? Color(0xFF97291F) : null),
                           const Divider(height: 1),
                           _sumRow('Total Pendapatan Bersih', rp(pendapatan),
                               bold: true,
-                              color: pendapatan < 0 ? Colors.red : null),
+                              color: pendapatan < 0 ? Color(0xFF97291F) : null),
                           const Divider(height: 1),
                           _sumRow('Jumlah Transaksi', '$n'),
                           const Divider(height: 1),
@@ -921,6 +958,12 @@ class _SalesBarChartState extends State<_SalesBarChart> {
           Wrap(spacing: 8, runSpacing: 4, children: [
             for (final k in _chartRanges.keys)
               ChoiceChip(
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFF97291F)),
+                labelStyle: const TextStyle(
+                    color: Color(0xFF97291F), fontWeight: FontWeight.w600),
+                selectedColor: const Color(0xFFF6E1DF),
+                checkmarkColor: Color(0xFF97291F),
                 label: Text(k),
                 selected: range == k,
                 onSelected: (_) => setState(() {
@@ -1192,7 +1235,7 @@ class _CatalogPageState extends State<CatalogPage> {
               onPressed: () => Navigator.pop(c, false),
               child: const Text('Batal')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Hapus')),
         ],
@@ -1275,10 +1318,10 @@ class _CatalogPageState extends State<CatalogPage> {
                   if (img != null)
                     TextButton.icon(
                         onPressed: () => set(() => img = null),
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(Icons.delete_outline,
+                            color: Color(0xFF97291F)),
                         label: const Text('Hapus',
-                            style: TextStyle(color: Colors.red))),
+                            style: TextStyle(color: Color(0xFF97291F)))),
                 ]),
                 const SizedBox(height: 8),
                 TextField(
@@ -1322,6 +1365,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(c, true),
                 child: const Text('Simpan')),
           ],
@@ -1389,6 +1433,10 @@ class _CatalogPageState extends State<CatalogPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
         floatingActionButton: FloatingActionButton.extended(
+            backgroundColor: Colors.white,
+            foregroundColor: Color(0xFF97291F),
+            shape:
+                const StadiumBorder(side: BorderSide(color: Color(0xFF97291F))),
             onPressed: () => _edit(null),
             icon: const Icon(Icons.add),
             label: const Text('Tambah Produk')),
@@ -1433,7 +1481,7 @@ class _CatalogPageState extends State<CatalogPage> {
                         PopupMenuItem(
                             value: 'hapus',
                             child: Text('Hapus',
-                                style: TextStyle(color: Colors.red))),
+                                style: TextStyle(color: Color(0xFF97291F)))),
                       ],
                     ),
                     onTap: () => _edit(p),
@@ -1467,7 +1515,7 @@ class _InventoryPageState extends State<InventoryPage> {
               onPressed: () => Navigator.pop(c, false),
               child: const Text('Batal')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Hapus')),
         ],
@@ -1502,6 +1550,7 @@ class _InventoryPageState extends State<InventoryPage> {
               onPressed: () => Navigator.pop(c, false),
               child: const Text('Batal')),
           FilledButton(
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Simpan'))
         ],
@@ -1522,7 +1571,7 @@ class _InventoryPageState extends State<InventoryPage> {
       ListView(padding: const EdgeInsets.all(16), children: [
         _title(context, 'Inventaris — Kemasan'),
         _note(
-            'Atur kemasan tiap menu di sini. Topping dan plastik cukup nama dan harga (harga diubah di Katalog Produk). Tidak ada stok produk, jadi menu karyawan tidak pernah terkunci "habis". Stok kemasan Kecil/Normal/Besar per outlet diatur di menu Target & Stok Kemasan.'),
+            'Atur kemasan tiap menu di sini. Topping dan plastik cukup nama dan harga (harga diubah di Katalog Produk). Topping dan plastik tidak punya stok, jadi tidak pernah terkunci. Kemasan Kecil/Normal/Besar otomatis terkunci "Stok habis" di menu karyawan kalau stoknya di outlet itu 0. Stok per outlet diatur di menu Target & Stok Kemasan.'),
         _Q(
           Db.q(
               'SELECT v.id vid, v.kemasan, v.price, p.id pid, p.name, p.category, c.name AS cname FROM variants v JOIN products p ON p.id=v.product_id LEFT JOIN categories c ON c.key=p.category ORDER BY p.category, p.name, v.price'),
@@ -1581,7 +1630,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           trailing: IconButton(
                               tooltip: 'Hapus kemasan',
                               icon: const Icon(Icons.delete_outline,
-                                  color: Colors.red),
+                                  color: Color(0xFF97291F)),
                               onPressed: () => _delVariant(v)),
                         ),
                       TextButton.icon(
@@ -1677,6 +1726,11 @@ class _StaffPageState extends State<StaffPage> {
                 Wrap(spacing: 8, children: [
                   for (final x in ['Admin', 'SPV', 'Mitra'])
                     ActionChip(
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFF97291F)),
+                        labelStyle: const TextStyle(
+                            color: Color(0xFF97291F),
+                            fontWeight: FontWeight.w600),
                         label: Text(x),
                         onPressed: () => ss(() {
                               l.text = x;
@@ -1700,6 +1754,7 @@ class _StaffPageState extends State<StaffPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(c, true),
                 child: const Text('Simpan')),
           ],
@@ -1752,6 +1807,7 @@ class _StaffPageState extends State<StaffPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(c, true),
                 child: const Text('Simpan')),
           ],
@@ -1802,6 +1858,13 @@ class _StaffPageState extends State<StaffPage> {
             child: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 SegmentedButton<bool>(
+                  style: SegmentedButton.styleFrom(
+                    foregroundColor: Color(0xFF97291F),
+                    selectedForegroundColor: Color(0xFF97291F),
+                    backgroundColor: Colors.white,
+                    selectedBackgroundColor: const Color(0xFFF6E1DF),
+                    side: const BorderSide(color: Color(0xFF97291F)),
+                  ),
                   segments: const [
                     ButtonSegment(value: false, label: Text('Semua outlet')),
                     ButtonSegment(value: true, label: Text('Outlet tertentu')),
@@ -1831,7 +1894,7 @@ class _StaffPageState extends State<StaffPage> {
                     const Padding(
                         padding: EdgeInsets.only(top: 4),
                         child: Text('Pilih minimal satu outlet',
-                            style: TextStyle(color: Colors.red))),
+                            style: TextStyle(color: Color(0xFF97291F)))),
                 ],
               ]),
             ),
@@ -1841,6 +1904,7 @@ class _StaffPageState extends State<StaffPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: (custom && sel.isEmpty)
                     ? null
                     : () => Navigator.pop(c, true),
@@ -1917,6 +1981,7 @@ class _StaffPageState extends State<StaffPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(c, true),
                 child: const Text('Simpan')),
           ],
@@ -1960,6 +2025,7 @@ class _StaffPageState extends State<StaffPage> {
               onPressed: () => Navigator.pop(d, false),
               child: const Text('Batal')),
           FilledButton(
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(d, true),
               child: const Text('Simpan')),
         ],
@@ -2004,7 +2070,7 @@ class _StaffPageState extends State<StaffPage> {
                 const SizedBox(height: 8),
                 if (outlets.isEmpty)
                   const Text('Belum ada outlet. Tambah dulu di menu Outlet.',
-                      style: TextStyle(color: Colors.red))
+                      style: TextStyle(color: Color(0xFF97291F)))
                 else
                   DropdownButtonFormField<String>(
                     initialValue: sel,
@@ -2024,6 +2090,7 @@ class _StaffPageState extends State<StaffPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed:
                     outlets.isEmpty ? null : () => Navigator.pop(c, true),
                 child: const Text('Simpan')),
@@ -2091,6 +2158,7 @@ class _StaffPageState extends State<StaffPage> {
               onPressed: () => Navigator.pop(d, false),
               child: const Text('Batal')),
           FilledButton(
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(d, true),
               child: const Text('Simpan')),
         ],
@@ -2150,7 +2218,7 @@ class _StaffPageState extends State<StaffPage> {
               onPressed: () => Navigator.pop(d, false),
               child: const Text('Batal')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(d, true),
               child: const Text('Hapus')),
         ],
@@ -2183,6 +2251,10 @@ class _StaffPageState extends State<StaffPage> {
     return Scaffold(
       floatingActionButton: dev
           ? FloatingActionButton.extended(
+              backgroundColor: Colors.white,
+              foregroundColor: Color(0xFF97291F),
+              shape: const StadiumBorder(
+                  side: BorderSide(color: Color(0xFF97291F))),
               onPressed: _chooseAdd,
               icon: const Icon(Icons.person_add),
               label: const Text('Tambah Akun'))
@@ -2243,8 +2315,8 @@ class _StaffPageState extends State<StaffPage> {
                   if (u['role'] != 'develop')
                     IconButton(
                         tooltip: 'Hapus akun',
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(Icons.delete_outline,
+                            color: Color(0xFF97291F)),
                         onPressed: () => _delete(u)),
                 ],
                 onSaved: () {
@@ -2432,7 +2504,9 @@ class _StaffRowState extends State<_StaffRow> {
                             child: const Text('Batal')),
                         const SizedBox(width: 8),
                         FilledButton(
-                            onPressed: _save, child: const Text('Simpan')),
+                            style: _kBtnPutih,
+                            onPressed: _save,
+                            child: const Text('Simpan')),
                       ]),
                     ]),
               ),
@@ -2503,7 +2577,7 @@ class _SubEditorState extends State<_SubEditor> {
                     '${expired ? '  • SUDAH BERAKHIR' : ''}',
             style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: expired ? Colors.red : null)),
+                color: expired ? Color(0xFF97291F) : null)),
         const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 4, children: [
           for (final m in const {
@@ -2513,6 +2587,10 @@ class _SubEditorState extends State<_SubEditor> {
             '+1 tahun': 12
           }.entries)
             ActionChip(
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFF97291F)),
+                labelStyle: const TextStyle(
+                    color: Color(0xFF97291F), fontWeight: FontWeight.w600),
                 label: Text(m.key,
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
@@ -2574,6 +2652,7 @@ class _CatDialogState extends State<_CatDialog> {
               onPressed: () => Navigator.pop(d, false),
               child: const Text('Batal')),
           FilledButton(
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(d, true),
               child: const Text('Simpan')),
         ],
@@ -2622,8 +2701,8 @@ class _CatDialogState extends State<_CatDialog> {
               if (err != null)
                 Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child:
-                        Text(err!, style: const TextStyle(color: Colors.red))),
+                    child: Text(err!,
+                        style: const TextStyle(color: Color(0xFF97291F)))),
               for (final k in cats)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -2647,6 +2726,7 @@ class _CatDialogState extends State<_CatDialog> {
               icon: const Icon(Icons.add),
               label: const Text('Tambah Kategori')),
           FilledButton(
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(context),
               child: const Text('Selesai')),
         ],
@@ -2794,6 +2874,7 @@ class _OutletPageState extends State<OutletPage> {
                 onPressed: () => Navigator.pop(d, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(d, true),
                 child: const Text('Simpan')),
           ],
@@ -2843,6 +2924,13 @@ class _OutletPageState extends State<OutletPage> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 if (g == null) ...[
                   SegmentedButton<String>(
+                    style: SegmentedButton.styleFrom(
+                      foregroundColor: Color(0xFF97291F),
+                      selectedForegroundColor: Color(0xFF97291F),
+                      backgroundColor: Colors.white,
+                      selectedBackgroundColor: const Color(0xFFF6E1DF),
+                      side: const BorderSide(color: Color(0xFF97291F)),
+                    ),
                     segments: const [
                       ButtonSegment(
                           value: 'pusat', label: Text('Outlet Pusat')),
@@ -2898,6 +2986,7 @@ class _OutletPageState extends State<OutletPage> {
                 onPressed: () => Navigator.pop(d, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(d, true),
                 child: const Text('Simpan')),
           ],
@@ -2986,6 +3075,7 @@ class _OutletPageState extends State<OutletPage> {
                 onPressed: () => Navigator.pop(c, false),
                 child: const Text('Batal')),
             FilledButton(
+                style: _kBtnPutih,
                 onPressed: () => Navigator.pop(c, true),
                 child: const Text('Simpan')),
           ],
@@ -3074,7 +3164,7 @@ class _OutletPageState extends State<OutletPage> {
               onPressed: () => Navigator.pop(d, false),
               child: const Text('Batal')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(d, true),
               child: const Text('Hapus')),
         ],
@@ -3121,6 +3211,7 @@ class _OutletPageState extends State<OutletPage> {
               onPressed: () => Navigator.pop(c, false),
               child: const Text('Batal')),
           FilledButton(
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Simpan')),
         ],
@@ -3173,7 +3264,7 @@ class _OutletPageState extends State<OutletPage> {
               onPressed: () => Navigator.pop(d, false),
               child: const Text('Batal')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: _kBtnPutih,
               onPressed: () => Navigator.pop(d, true),
               child: const Text('Hapus')),
         ],
@@ -3204,7 +3295,8 @@ class _OutletPageState extends State<OutletPage> {
               ? null
               : IconButton(
                   tooltip: 'Hapus outlet',
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon: const Icon(Icons.delete_outline,
+                      color: Color(0xFF97291F)),
                   onPressed: () =>
                       _del(r['name'] as String, (r['staff'] as num).toInt())),
         ),
@@ -3295,6 +3387,10 @@ class _OutletPageState extends State<OutletPage> {
   Widget build(BuildContext context) => Scaffold(
         floatingActionButton: Session.isDevelop
             ? FloatingActionButton.extended(
+                backgroundColor: Colors.white,
+                foregroundColor: Color(0xFF97291F),
+                shape: const StadiumBorder(
+                    side: BorderSide(color: Color(0xFF97291F))),
                 onPressed: _add,
                 icon: const Icon(Icons.add_business),
                 label: const Text('Tambah Outlet'))

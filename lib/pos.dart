@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'db.dart';
+import 'held.dart';
 import 'product_image.dart';
 import 'printer.dart';
 import 'prefs.dart';
@@ -107,10 +108,13 @@ class _PosPageState extends State<PosPage> {
     _load();
     _loadCats();
     _loadPromo();
+    HeldOrders.refresh();
+    HeldOrders.resume.addListener(_onResumeReq);
   }
 
   @override
   void dispose() {
+    HeldOrders.resume.removeListener(_onResumeReq);
     _search.dispose();
     _tick.dispose();
     super.dispose();
@@ -153,7 +157,7 @@ class _PosPageState extends State<PosPage> {
     _loadPromo(); // stok promo bisa berubah dari menu Stok Kemasan
   }
 
-  // ---------- kuota kemasan (Kecil habis saat target terpenuhi) ----------
+  // ---------- sisa kemasan (stok 0 = tidak bisa dijual; Kecil juga habis saat target terpenuhi) ----------
   int _inCart(String kem) =>
       cart.where((e) => e.kemasan == kem).fold<int>(0, (a, e) => a + e.qty);
 
@@ -243,7 +247,7 @@ class _PosPageState extends State<PosPage> {
                       child: Text('Stok habis',
                           style: TextStyle(
                               fontSize: 11,
-                              color: Colors.red,
+                              color: Color(0xFF97291F),
                               fontWeight: FontWeight.w700)),
                     ),
                   Text(rp(vs[i]['price'] as int),
@@ -377,8 +381,8 @@ class _PosPageState extends State<PosPage> {
   // ---------- konfirmasi -> bayar -> berhasil ----------
   Future<void> _confirm() async {
     if (cart.isEmpty) return;
-    // pengaman terakhir: kemasan yang kuotanya habis tidak boleh terjual
-    for (final k in Target.limited) {
+    // pengaman terakhir: kemasan yang stoknya habis (0) tidak boleh terjual
+    for (final k in Target.names) {
       final l = await _left(k);
       if (l != null && _inCart(k) > l) {
         if (mounted) {
@@ -415,6 +419,121 @@ class _PosPageState extends State<PosPage> {
     _tick.value++;
     _loadPromo();
     _success(res);
+  }
+
+  // ---------- simpan pesanan / lanjutkan pesanan tersimpan ----------
+  Future<void> _saveOrder({BuildContext? sheetCtx}) async {
+    if (cart.isEmpty) {
+      _snack('Keranjang masih kosong.');
+      return;
+    }
+    // Nama disimpan di variabel biasa (bukan TextEditingController) agar tidak
+    // error "used after being disposed" saat dialog menutup.
+    String label = '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Simpan Pesanan',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$_count item • ${rp(_total)}',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 14),
+                TextFormField(
+                  autofocus: true,
+                  maxLength: 40,
+                  textCapitalization: TextCapitalization.words,
+                  onChanged: (v) => label = v,
+                  decoration: InputDecoration(
+                    labelText: 'Nama pelanggan / no. meja (opsional)',
+                    prefixIcon: const Icon(Icons.person_outline_rounded),
+                    isDense: true,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ]),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Batal')),
+          FilledButton.icon(
+              onPressed: () => Navigator.pop(c, true),
+              icon: const Icon(Icons.bookmark_add_rounded, size: 18),
+              label: const Text('Simpan')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await HeldOrders.save(cart, label.trim());
+    if (!mounted) return;
+    if (sheetCtx != null) {
+      _sheetSet = null;
+      Navigator.pop(sheetCtx);
+    }
+    _mut(cart.clear);
+    _snack('Pesanan disimpan. Buka lewat tombol di pojok atas.');
+  }
+
+  void _onResumeReq() {
+    final o = HeldOrders.resume.value;
+    if (o == null || !mounted) return;
+    HeldOrders.resume.value = null;
+    _resume(o);
+  }
+
+  Future<void> _resume(Rec o) async {
+    final items = HeldOrders.decode((o['items'] ?? '[]') as String);
+    if (items.isEmpty) {
+      _snack('Pesanan ini kosong atau rusak.');
+      return;
+    }
+    var replace = true;
+    if (cart.isNotEmpty) {
+      final a = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Keranjang masih berisi'),
+          content: const Text(
+              'Gabungkan pesanan tersimpan ke keranjang ini, atau ganti seluruh isi keranjang?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+            TextButton(
+                onPressed: () => Navigator.pop(c, 'gabung'),
+                child: const Text('Gabung')),
+            FilledButton(
+                onPressed: () => Navigator.pop(c, 'ganti'),
+                child: const Text('Ganti')),
+          ],
+        ),
+      );
+      if (a == null || !mounted) return;
+      replace = a == 'ganti';
+    }
+    await HeldOrders.delete(o['id'] as int);
+    if (!mounted) return;
+    _mut(() {
+      if (replace) cart.clear();
+      for (final it in items) {
+        final ex = cart.indexWhere(
+            (e) => e.variantId == it.variantId && e.note == it.note);
+        if (ex >= 0) {
+          cart[ex].qty += it.qty;
+        } else {
+          cart.add(it);
+        }
+      }
+    });
+    _snack('Pesanan dilanjutkan. Cek kembali sebelum membayar.');
   }
 
   void _success(Rec res) {
@@ -512,7 +631,7 @@ class _PosPageState extends State<PosPage> {
     );
   }
 
-  static const _hargaWarna = Color(0xFFE64A19); // oranye-merah, seperti katalog
+  static const _hargaWarna = Color(0xFF97291F); // oranye-merah, seperti katalog
 
   /// Tinggi bagian teks kartu (di bawah gambar) menurut lebar kartu.
   static double _teksTinggi(double w) => w < 120 ? 64 : 84;
@@ -937,44 +1056,54 @@ class _PosPageState extends State<PosPage> {
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.8)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: 'Cari menu atau ketik kode (#01)...',
-              prefixIcon:
-                  Icon(Icons.search_rounded, size: 22, color: cs.primary),
-              suffixIcon: q.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () => _setCat(cat)),
-              filled: true,
-              fillColor: Colors.transparent,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
+        child: Row(children: [
+          Expanded(
+              child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border:
+                  Border.all(color: cs.outlineVariant.withValues(alpha: 0.8)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            onChanged: (v) => setState(() {
-              q = v;
-              _load();
-            }),
-          ),
-        ),
+            child: TextField(
+              controller: _search,
+              decoration: InputDecoration(
+                hintText: 'Cari menu atau ketik kode (#01)...',
+                prefixIcon:
+                    Icon(Icons.search_rounded, size: 22, color: cs.primary),
+                suffixIcon: q.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => _setCat(cat)),
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+              onChanged: (v) => setState(() {
+                q = v;
+                _load();
+              }),
+            ),
+          )),
+          // layar lebar tidak punya AppBar, tombolnya ditaruh di sini
+          if (MediaQuery.of(context).size.width >= 700)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: HeldButton(color: cs.primary),
+            ),
+        ]),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
@@ -1133,7 +1262,7 @@ class _PosPageState extends State<PosPage> {
           if (cart.isNotEmpty)
             TextButton.icon(
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.red.shade700,
+                  foregroundColor: Color(0xFF97291F),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 ),
@@ -1380,35 +1509,57 @@ class _PosPageState extends State<PosPage> {
             ]),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: Colors.white,
-                elevation: 2,
-                shadowColor: cs.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: cart.isEmpty
-                  ? null
-                  : () {
-                      if (sheetCtx != null) {
-                        _sheetSet = null;
-                        Navigator.pop(sheetCtx);
-                      }
-                      _confirm();
-                    },
-              icon: const Icon(Icons.payments_rounded, size: 20),
-              label: Text(
-                cart.isEmpty ? 'Pilih Menu' : 'Bayar Sekarang',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          Row(children: [
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: cs.primary,
+                  side: BorderSide(color: cs.primary.withValues(alpha: 0.6)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed:
+                    cart.isEmpty ? null : () => _saveOrder(sheetCtx: sheetCtx),
+                icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+                label: const Text('Simpan',
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
               ),
             ),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: cs.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shadowColor: cs.primary.withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: cart.isEmpty
+                      ? null
+                      : () {
+                          if (sheetCtx != null) {
+                            _sheetSet = null;
+                            Navigator.pop(sheetCtx);
+                          }
+                          _confirm();
+                        },
+                  icon: const Icon(Icons.payments_rounded, size: 20),
+                  label: Text(
+                    cart.isEmpty ? 'Pilih Menu' : 'Bayar Sekarang',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ),
+          ]),
         ]),
       ),
     ]);
@@ -1446,7 +1597,7 @@ class _PosPageState extends State<PosPage> {
             Text(note,
                 style: TextStyle(
                     fontSize: 11,
-                    color: _promoStock <= 0 ? Colors.red : cs.outline)),
+                    color: _promoStock <= 0 ? Color(0xFF97291F) : cs.outline)),
           ]),
         ),
         IconButton(
@@ -1508,73 +1659,101 @@ class _PosPageState extends State<PosPage> {
           onTap: _openCart,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shopping_bag_outlined,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 6),
+                      Text('$_count',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Total Tagihan',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500)),
+                      Text(rp(_total),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Lihat & Bayar',
+                          style: TextStyle(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_rounded,
+                          size: 16, color: cs.primary),
+                    ],
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              // tombol simpan pesanan (tidak ikut membuka keranjang)
+              Material(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.shopping_bag_outlined,
-                        color: Colors.white, size: 20),
-                    const SizedBox(width: 6),
-                    Text('$_count',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Total Tagihan',
-                        style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500)),
-                    Text(rp(_total),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18)),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                  onTap: _saveOrder,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 9),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bookmark_add_rounded,
+                            size: 18, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('Simpan Pesanan',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13)),
+                      ],
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Lihat & Bayar',
-                        style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13)),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_rounded,
-                        size: 16, color: cs.primary),
-                  ],
+                  ),
                 ),
               ),
             ]),
@@ -1768,10 +1947,10 @@ class _PayDialogState extends State<PayDialog> {
           for (final n in [0, 5, 10, 15, 20, 25])
             ActionChip(
                 backgroundColor: Colors.white,
-                side: const BorderSide(color: Colors.red),
+                side: const BorderSide(color: Color(0xFF97291F)),
                 label: Text('$n%',
                     style: const TextStyle(
-                        color: Colors.red, fontWeight: FontWeight.w600)),
+                        color: Color(0xFF97291F), fontWeight: FontWeight.w600)),
                 onPressed: () => setState(() => pct.text = '$n')),
         ]),
         Padding(
@@ -1844,10 +2023,10 @@ class _PayDialogState extends State<PayDialog> {
         for (final n in _suggest)
           ActionChip(
               backgroundColor: Colors.white,
-              side: const BorderSide(color: Colors.red),
+              side: const BorderSide(color: Color(0xFF97291F)),
               label: Text(rp(n),
                   style: const TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.w600)),
+                      color: Color(0xFF97291F), fontWeight: FontWeight.w600)),
               onPressed:
                   busy ? null : () => setState(() => cash.text = moneyText(n))),
       ]),
@@ -1873,7 +2052,7 @@ class _PayDialogState extends State<PayDialog> {
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: enough ? Colors.green.shade700 : Colors.red)),
+                  color: enough ? Colors.green.shade700 : Color(0xFF97291F))),
         ),
       if (enough && maxJajan > 0)
         Container(
@@ -2107,7 +2286,7 @@ class _SuccessView extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: (printed ? Colors.green : Colors.red)
+                    color: (printed ? Colors.green : Color(0xFF97291F))
                         .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -2120,7 +2299,7 @@ class _SuccessView extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: printed
                             ? Colors.green.shade800
-                            : Colors.red.shade800),
+                            : Color(0xFF97291F)),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -2137,7 +2316,7 @@ class _SuccessView extends StatelessWidget {
                     ] else ...[
                       _box(c, 'Diterima', rp(t['cash'] as int), w),
                       _box(c, 'Kembalian', rp(t['change_amt'] as int), w,
-                          color: Colors.red),
+                          color: Color(0xFF97291F)),
                       if (jajanOf(t) > 0) ...[
                         _box(
                             c,

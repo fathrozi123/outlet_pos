@@ -577,8 +577,15 @@ class Db {
     final String outletName = Session.outlet;
     late int id;
     await d.transaction((t) async {
+      // Kode pendek: ddMM-urutan harian, mis. 1611-007 (urutan lanjut dari
+      // kode terbesar hari itu, jadi tetap unik walau ada transaksi dihapus).
+      final pre = DateFormat('ddMM').format(now);
+      final mx = await t.rawQuery(
+          'SELECT MAX(CAST(substr(code, 6) AS INTEGER)) m FROM transactions WHERE code LIKE ?',
+          ['$pre-%']);
+      final seq = ((mx.first['m'] as int?) ?? 0) + 1;
       id = await t.insert('transactions', {
-        'code': 'INV${DateFormat('yyMMddHHmmss').format(now)}',
+        'code': '$pre-${seq.toString().padLeft(3, '0')}',
         'created_at': now.toIso8601String(),
         'user_id': Session.id,
         'user_name': Session.name,

@@ -13,16 +13,26 @@ class Target {
   /// (tampil "Stok habis"). Normal dan Besar tetap bisa dijual.
   static const limited = {'Kecil'};
 
-  /// Sisa kuota hari ini untuk satu kemasan. null = tanpa batas.
-  /// Kuota kembali penuh otomatis saat tanggal berganti (00.00) atau
-  /// kalau admin menaikkan target.
+  /// Sisa kemasan yang masih boleh dijual untuk satu kemasan. null = tanpa batas
+  /// (topping, kresek, dan item tanpa kemasan).
+  /// Untuk Kecil/Normal/Besar batasnya adalah STOK KEMASAN outlet: stok 0 =
+  /// tidak bisa dijual. Khusus Kecil, batas juga dipotong sisa target harian
+  /// (kuota kembali penuh otomatis saat tanggal berganti 00.00 atau kalau
+  /// admin menaikkan target).
   static Future<int?> left(String outlet, String kemasan) async {
-    if (!limited.contains(kemasan)) return null;
-    final t = (await get(outlet))[kemasan] ?? 0;
-    if (t <= 0) return null;
-    final day = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final s = (await sold(outlet, day))[kemasan] ?? 0;
-    return (t - s).clamp(0, t).toInt();
+    if (!names.contains(kemasan)) return null;
+    if (outlet.isEmpty) return null; // akun tanpa outlet tidak dibatasi stok
+    var r = (await stock(outlet))[kemasan] ?? 0;
+    if (limited.contains(kemasan)) {
+      final t = (await get(outlet))[kemasan] ?? 0;
+      if (t > 0) {
+        final day = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        final s = (await sold(outlet, day))[kemasan] ?? 0;
+        final q = (t - s).clamp(0, t).toInt();
+        if (q < r) r = q;
+      }
+    }
+    return r < 0 ? 0 : r;
   }
 
   static String key(String outlet, String n) =>
@@ -214,6 +224,13 @@ class Target {
             child: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 SegmentedButton<String>(
+                  style: SegmentedButton.styleFrom(
+                    foregroundColor: Color(0xFF97291F),
+                    selectedForegroundColor: Color(0xFF97291F),
+                    backgroundColor: Colors.white,
+                    selectedBackgroundColor: const Color(0xFFF6E1DF),
+                    side: const BorderSide(color: Color(0xFF97291F)),
+                  ),
                   segments: const [
                     ButtonSegment(value: 'add', label: Text('Tambah')),
                     ButtonSegment(value: 'sub', label: Text('Kurangi')),
@@ -361,7 +378,17 @@ class _TargetCardState extends State<TargetCard> {
     });
   }
 
-  Widget _seg(String n, ColorScheme cs, bool big) {
+  /// Isi kartu menyesuaikan ruang yang tersedia pada tampilan besar/layar sempit.
+  /// FittedBox mencegah Column melampaui tinggi kartu.
+  Widget _fit(bool scaleDown, Widget c) => scaleDown
+      ? LayoutBuilder(
+          builder: (_, bc) => FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: SizedBox(width: bc.maxWidth, child: c)))
+      : c;
+
+  Widget _seg(String n, ColorScheme cs, bool big, {bool narrow = false}) {
     final s = sold[n] ?? 0;
     final t = target[n] ?? 0;
     final done = t > 0 && s >= t;
@@ -369,96 +396,130 @@ class _TargetCardState extends State<TargetCard> {
     final pct = t == 0 ? 0.0 : (s / t).clamp(0.0, 1.0).toDouble();
     // Kecil: kuota habis = stok habis (merah). Normal/Besar tetap "tercapai".
     final habis = done && Target.limited.contains(n);
-    final color = habis ? Colors.red : (done ? Colors.green : cs.primary);
+    final color =
+        habis ? Color(0xFF97291F) : (done ? Colors.green : cs.primary);
+    // Layar sempit (HP) pada tampilan besar: kartu ditumpuk ke bawah, ukuran diperkecil.
+    final pad = narrow ? 16.0 : (big ? 24.0 : 10.0);
+    final nameSz = narrow ? 24.0 : (big ? 28.0 : 13.0);
+    final numSz = narrow ? 56.0 : (big ? 84.0 : 22.0);
+    final barH = narrow ? 14.0 : (big ? 16.0 : 6.0);
+    final statSz = narrow ? 18.0 : (big ? 22.0 : 11.0);
+    final g1 = narrow ? 4.0 : (big ? 12.0 : 2.0);
+    final g2 = narrow ? 6.0 : (big ? 16.0 : 6.0);
+    final g3 = narrow ? 6.0 : (big ? 12.0 : 4.0);
+    final marg = narrow
+        ? const EdgeInsets.symmetric(vertical: 6)
+        : EdgeInsets.symmetric(horizontal: big ? 8 : 4);
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: big ? 8 : 4),
-      padding: EdgeInsets.all(big ? 24 : 10),
+      margin: marg,
+      padding: EdgeInsets.all(pad),
       decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: color.withValues(alpha: 0.2))),
-      child: Column(
-        mainAxisSize: big ? MainAxisSize.max : MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(n,
-              style: TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: big ? 28 : 13)),
-          SizedBox(height: big ? 12 : 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('$s / $t',
-                style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: big ? 84 : 22,
-                    color: color)),
-          ),
-          SizedBox(height: big ? 16 : 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-                value: pct,
-                minHeight: big ? 16 : 6,
-                color: color,
-                backgroundColor: color.withValues(alpha: 0.15)),
-          ),
-          SizedBox(height: big ? 12 : 4),
-          Text(habis ? 'Stok habis' : (done ? 'Target tercapai' : 'Sisa $left'),
-              style: TextStyle(
-                  fontSize: big ? 22 : 11,
-                  fontWeight: FontWeight.w600,
-                  color:
-                      habis ? Colors.red : (done ? Colors.green : cs.outline))),
-        ],
-      ),
+      child: _fit(
+          big,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(n,
+                  style:
+                      TextStyle(fontWeight: FontWeight.w700, fontSize: nameSz)),
+              SizedBox(height: g1),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('$s / $t',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: numSz,
+                        color: color)),
+              ),
+              SizedBox(height: g2),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: barH,
+                    color: color,
+                    backgroundColor: color.withValues(alpha: 0.15)),
+              ),
+              SizedBox(height: g3),
+              Text(
+                  habis
+                      ? 'Stok habis'
+                      : (done ? 'Target tercapai' : 'Sisa $left'),
+                  style: TextStyle(
+                      fontSize: statSz,
+                      fontWeight: FontWeight.w600,
+                      color: habis
+                          ? Color(0xFF97291F)
+                          : (done ? Colors.green : cs.outline))),
+            ],
+          )),
     );
   }
 
   /// Kotak Jumat Promo: stok promo outlet (ditambah karyawan) + terpakai hari ini.
-  Widget _promoSeg(ColorScheme cs, bool big) {
-    final color = promoStock <= 0 ? Colors.red : Colors.deepOrange;
+  Widget _promoSeg(ColorScheme cs, bool big, {bool narrow = false}) {
+    final color = promoStock <= 0 ? Color(0xFF97291F) : Colors.deepOrange;
+    // Layar sempit (HP) pada tampilan besar: kartu ditumpuk ke bawah, ukuran diperkecil.
+    final pad = narrow ? 16.0 : (big ? 24.0 : 10.0);
+    final nameSz = narrow ? 24.0 : (big ? 28.0 : 13.0);
+    final numSz = narrow ? 56.0 : (big ? 84.0 : 22.0);
+    final statSz = narrow ? 18.0 : (big ? 22.0 : 11.0);
+    final g1 = narrow ? 4.0 : (big ? 12.0 : 2.0);
+    final g2 = narrow ? 6.0 : (big ? 16.0 : 6.0);
+    final g3 = narrow ? 6.0 : (big ? 12.0 : 4.0);
+    final marg = narrow
+        ? const EdgeInsets.symmetric(vertical: 6)
+        : EdgeInsets.symmetric(horizontal: big ? 8 : 4);
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: big ? 8 : 4),
-      padding: EdgeInsets.all(big ? 24 : 10),
+      margin: marg,
+      padding: EdgeInsets.all(pad),
       decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: color.withValues(alpha: 0.2))),
-      child: Column(
-        mainAxisSize: big ? MainAxisSize.max : MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('Jumat Promo',
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: big ? 28 : 13)),
-          ),
-          SizedBox(height: big ? 12 : 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('$promoStock',
-                style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: big ? 84 : 22,
-                    color: color)),
-          ),
-          SizedBox(height: big ? 16 : 6),
-          Icon(Icons.card_giftcard, size: big ? 16 : 6, color: color),
-          SizedBox(height: big ? 12 : 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-                promoStock <= 0
-                    ? 'Stok habis • terpakai $promoUsed'
-                    : 'Stok • terpakai $promoUsed',
-                style: TextStyle(
-                    fontSize: big ? 22 : 11,
-                    fontWeight: FontWeight.w600,
-                    color: promoStock <= 0 ? Colors.red : cs.outline)),
-          ),
-        ],
-      ),
+      child: _fit(
+          big,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('Jumat Promo',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: nameSz)),
+              ),
+              SizedBox(height: g1),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('$promoStock',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: numSz,
+                        color: color)),
+              ),
+              SizedBox(height: g2),
+              Icon(Icons.card_giftcard,
+                  size: narrow ? 14 : (big ? 16 : 6), color: color),
+              SizedBox(height: g3),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                    promoStock <= 0
+                        ? 'Stok habis • terpakai $promoUsed'
+                        : 'Stok • terpakai $promoUsed',
+                    style: TextStyle(
+                        fontSize: statSz,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            promoStock <= 0 ? Color(0xFF97291F) : cs.outline)),
+              ),
+            ],
+          )),
     );
   }
 
@@ -466,12 +527,14 @@ class _TargetCardState extends State<TargetCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final big = widget.big;
-    final segs = [
-      for (final n in Target.names) Expanded(child: _seg(n, cs, big)),
+    final narrow = big && MediaQuery.of(context).size.width < 600;
+    final cards = [
+      for (final n in Target.names) _seg(n, cs, big, narrow: narrow),
       // Jumat Promo: pegawai hanya melihatnya di hari Jumat (admin selalu)
       if (Session.isAdmin || DateTime.now().weekday == DateTime.friday)
-        Expanded(child: _promoSeg(cs, big)),
+        _promoSeg(cs, big, narrow: narrow),
     ];
+    final segs = [for (final c in cards) Expanded(child: c)];
     final title = widget.outlet.isEmpty
         ? 'Target Kemasan Hari Ini'
         : 'Target Hari Ini • ${widget.outlet}';
@@ -538,7 +601,13 @@ class _TargetCardState extends State<TargetCard> {
           ? Column(children: [
               header,
               const SizedBox(height: 20),
-              Expanded(child: Row(children: segs)),
+              Expanded(
+                child: narrow
+                    ? ListView(children: [
+                        for (final c in cards) SizedBox(height: 176, child: c)
+                      ])
+                    : Row(children: segs),
+              ),
             ])
           : Column(mainAxisSize: MainAxisSize.min, children: [
               header,

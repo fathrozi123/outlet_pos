@@ -203,14 +203,26 @@ class _ReportPegawaiState extends State<ReportPegawai> {
       const SizedBox(height: 8),
       Wrap(spacing: 8, children: [
         ActionChip(
+            backgroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xFF97291F)),
+            labelStyle: const TextStyle(
+                color: Color(0xFF97291F), fontWeight: FontWeight.w600),
             label: const Text('Hari ini'),
             onPressed: () =>
                 _apply(() => range = DateTimeRange(start: now, end: now))),
         ActionChip(
+            backgroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xFF97291F)),
+            labelStyle: const TextStyle(
+                color: Color(0xFF97291F), fontWeight: FontWeight.w600),
             label: const Text('7 hari'),
             onPressed: () => _apply(() => range = DateTimeRange(
                 start: now.subtract(const Duration(days: 6)), end: now))),
         ActionChip(
+            backgroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xFF97291F)),
+            labelStyle: const TextStyle(
+                color: Color(0xFF97291F), fontWeight: FontWeight.w600),
             label: const Text('Bulan ini'),
             onPressed: () => _apply(() => range = DateTimeRange(
                 start: DateTime(now.year, now.month, 1), end: now))),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'admin.dart';
 import 'closing.dart';
 import 'db.dart';
+import 'held.dart';
 import 'login.dart';
 import 'pages.dart';
 import 'pos.dart';
@@ -486,6 +487,8 @@ class _ShellState extends State<Shell> {
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
           ),
           actions: [
+            // Transaksi: simpan pesanan, di sebelah nama outlet
+            if (cur == 'transaksi') const HeldButton(color: Colors.white),
             if (!Session.isAdmin && Session.outlet.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(right: 14),

@@ -95,7 +95,8 @@ class _LoginPageState extends State<LoginPage> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 400),
                   child: Container(
@@ -103,7 +104,8 @@ class _LoginPageState extends State<LoginPage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.8)),
+                      border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.8)),
                       boxShadow: [
                         BoxShadow(
                           color: cs.primary.withValues(alpha: 0.06),
@@ -137,8 +139,14 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.storefront_rounded,
-                              size: 38, color: Colors.white),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/icon/logo.png',
+                              width: 76,
+                              height: 76,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 18),
                         Text(
@@ -205,21 +213,21 @@ class _LoginPageState extends State<LoginPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFEBEE),
+                              color: const Color(0xFFF9E8E6),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: const Color(0xFFFFCDD2)),
+                              border:
+                                  Border.all(color: const Color(0xFFE9B9B4)),
                             ),
                             child: Row(
                               children: [
                                 const Icon(Icons.error_outline_rounded,
-                                    size: 18, color: Colors.red),
+                                    size: 18, color: Color(0xFF97291F)),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     err!,
                                     style: const TextStyle(
-                                      color: Colors.red,
+                                      color: Color(0xFF97291F),
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -248,8 +256,7 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   )
                                 : const Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
                                         'Masuk',

@@ -93,7 +93,7 @@ class _StokKemasanPageState extends State<StokKemasanPage> {
     final habis = s <= 0;
     final tipis = !habis && s < 10;
     final color = habis
-        ? Colors.red
+        ? Color(0xFF97291F)
         : tipis
             ? Colors.orange.shade800
             : cs.onSurface;
@@ -103,7 +103,7 @@ class _StokKemasanPageState extends State<StokKemasanPage> {
         title: Text('Kemasan $n',
             style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: habis
-            ? const Text('Habis', style: TextStyle(color: Colors.red))
+            ? const Text('Habis', style: TextStyle(color: Color(0xFF97291F)))
             : tipis
                 ? Text('Menipis',
                     style: TextStyle(color: Colors.orange.shade800))

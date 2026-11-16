@@ -24,7 +24,7 @@ String _dmy(String iso) => DateFormat('dd/MM/yyyy').format(DateTime.parse(iso));
   final diff = counted - expected;
   if (diff > 0) return ('PLUS ${rp(diff)}', Colors.green.shade700);
   if (diff == 0) return ('BALANCE', Colors.blue.shade700);
-  return ('MINUS ${rp(-diff)}', Colors.red);
+  return ('MINUS ${rp(-diff)}', Color(0xFF97291F));
 }
 
 class ClosingPage extends StatefulWidget {
@@ -273,7 +273,7 @@ class _ClosingPageState extends State<ClosingPage> {
               onPressed: () => Navigator.pop(c, false),
               child: const Text('Batal')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: Color(0xFF97291F)),
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Hapus')),
         ],
@@ -404,7 +404,7 @@ class _ClosingPageState extends State<ClosingPage> {
     return Row(children: [
       chip('Plus', Colors.green.shade700, st.startsWith('PLUS')),
       chip('Balance', Colors.blue.shade700, st == 'BALANCE'),
-      chip('Minus', Colors.red, st.startsWith('MINUS')),
+      chip('Minus', Color(0xFF97291F), st.startsWith('MINUS')),
     ]);
   }
 
@@ -443,17 +443,18 @@ class _ClosingPageState extends State<ClosingPage> {
                   visualDensity: VisualDensity.compact,
                   iconSize: 18,
                   tooltip: 'Hapus',
-                  icon: const Icon(Icons.close, color: Colors.red),
+                  icon: const Icon(Icons.close, color: Color(0xFF97291F)),
                   onPressed: () => _delExpense(e)),
           ]),
         ),
       const Divider(height: 12),
       _ro('Modal', rp(_v(modal))),
       _ro('Pengeluaran', spent == 0 ? rp(0) : '- ${rp(spent)}',
-          color: spent > 0 ? Colors.red : null),
+          color: spent > 0 ? Color(0xFF97291F) : null),
       const Divider(height: 12),
       _ro('Sisa modal', rp(left),
-          bold: true, color: left < 0 ? Colors.red : Colors.green.shade700),
+          bold: true,
+          color: left < 0 ? Color(0xFF97291F) : Colors.green.shade700),
       const Padding(
         padding: EdgeInsets.only(top: 4),
         child: Text('Sisa modal berkurang otomatis saat ada pengeluaran.',

@@ -4,7 +4,7 @@ import 'db.dart';
 import 'login.dart';
 import 'prefs.dart';
 
-const kRed = Color(0xFFD32F2F);
+const kRed = Color(0xFF97291F);
 
 ThemeData buildTheme() {
   final scheme =
@@ -12,12 +12,12 @@ ThemeData buildTheme() {
           .copyWith(
     primary: kRed,
     onPrimary: Colors.white,
-    primaryContainer: const Color(0xFFFFE3E3),
-    onPrimaryContainer: const Color(0xFF7F0000),
-    secondary: const Color(0xFFB71C1C),
+    primaryContainer: const Color(0xFFF6E1DF),
+    onPrimaryContainer: const Color(0xFF6B1C14),
+    secondary: const Color(0xFF97291F),
     onSecondary: Colors.white,
-    secondaryContainer: const Color(0xFFFFE3E3),
-    onSecondaryContainer: const Color(0xFF7F0000),
+    secondaryContainer: const Color(0xFFF6E1DF),
+    onSecondaryContainer: const Color(0xFF6B1C14),
     surface: Colors.white,
     onSurface: const Color(0xFF2B1B1B),
     surfaceTint: Colors.transparent,
@@ -99,11 +99,11 @@ ThemeData buildTheme() {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Colors.red, width: 1),
+        borderSide: const BorderSide(color: Color(0xFF97291F), width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Colors.red, width: 1.8),
+        borderSide: const BorderSide(color: Color(0xFF97291F), width: 1.8),
       ),
       hintStyle: const TextStyle(color: Color(0xFFB09898), fontSize: 14),
       labelStyle: const TextStyle(color: Color(0xFF8D6E6E)),
