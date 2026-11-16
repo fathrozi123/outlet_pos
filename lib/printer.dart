@@ -186,7 +186,7 @@ class Printer {
         await CapabilityProfile.load());
     List<int> b = [];
     b += g.reset();
-    b += g.text('Tes cetak aman boskuh',
+    b += g.text('Printer aman boskuh',
         styles: const PosStyles(align: PosAlign.center, bold: true));
     b += g.feed(3);
     return PrintBluetoothThermal.writeBytes(b);
