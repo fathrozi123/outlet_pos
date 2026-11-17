@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
 import 'attendance_photo.dart';
 import 'db.dart';
+import 'excel_export.dart';
 import 'nota.dart';
 import 'product_image.dart';
 import 'rekapitulasi.dart';
@@ -514,6 +515,59 @@ class _ReportSummaryState extends State<ReportSummary> {
     if (r != null) _setRange(r.start, r.end);
   }
 
+  Future<void> _export({
+    required int count,
+    required num kotor,
+    required num diskon,
+    required num bersih,
+    required num modal,
+    required num beban,
+    required num pendapatan,
+    required List<Rec> periods,
+  }) async {
+    try {
+      final rangeTxt =
+          '${_fmt.format(range.start)} - ${_fmt.format(range.end)}';
+      if (!mounted) return;
+      await shareExcel(
+        context: context,
+        title: 'Ringkasan Penjualan',
+        fileName: 'ringkasan_penjualan_${_iso(range.start)}_${_iso(range.end)}',
+        sheets: {
+          'Laporan Penjualan': [
+            ['Ringkasan Penjualan', 'Nilai'],
+            ['Outlet', outlet.isEmpty ? 'Semua Toko' : outlet],
+            ['Periode', rangeTxt],
+            ['Penjualan Kotor', kotor],
+            ['Diskon', diskon],
+            ['Total Pendapatan Kotor', bersih],
+            ['Modal', modal],
+            ['Beban', beban],
+            ['Total Pendapatan Bersih', pendapatan],
+            ['Jumlah Transaksi', count],
+            [
+              'Rata-rata per Transaksi',
+              count == 0 ? 0 : (bersih / count).round()
+            ],
+          ],
+          'Tren Penjualan': [
+            ['Periode', 'Jumlah Transaksi', 'Penjualan Bersih'],
+            for (final e in periods) [e['p'], e['n'], e['t']],
+          ],
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('Laporan dan tren penjualan siap dibagikan')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal mengekspor: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -563,8 +617,33 @@ class _ReportSummaryState extends State<ReportSummary> {
           return ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
               children: [
-                _title(c,
-                    'Ringkasan Penjualan${outlet.isEmpty ? '' : ' • $outlet'}'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(children: [
+                    Expanded(
+                      child: Text(
+                        'Ringkasan Penjualan${outlet.isEmpty ? '' : ' • $outlet'}',
+                        style: Theme.of(c).textTheme.titleLarge,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => _export(
+                        count: n,
+                        kotor: kotor,
+                        diskon: diskon,
+                        bersih: bersih,
+                        modal: modal,
+                        beban: beban,
+                        pendapatan: pendapatan,
+                        periods: rows,
+                      ),
+                      icon: const Icon(Icons.file_download_outlined, size: 18),
+                      label: const Text('Ekspor Excel'),
+                    ),
+                  ]),
+                ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(outlet.isEmpty ? 'Semua Outlet' : outlet,
@@ -768,6 +847,54 @@ class _SalesBarChartState extends State<_SalesBarChart> {
   static DateTime _monday(DateTime d) =>
       DateTime(d.year, d.month, d.day - (d.weekday - 1));
 
+  Future<void> _export(_ChartData data) async {
+    try {
+      final total = data.buckets.fold<num>(0, (sum, b) => sum + b.t);
+      final count = data.buckets.fold<int>(0, (sum, b) => sum + b.n);
+      if (!mounted) return;
+      await shareExcel(
+        context: context,
+        title: 'Tren Penjualan',
+        fileName:
+            'tren_penjualan_${range.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')}',
+        sheets: {
+          'Tren Penjualan': [
+            ['Tren Penjualan', 'Nilai'],
+            ['Outlet', widget.outlet.isEmpty ? 'Semua Toko' : widget.outlet],
+            ['Rentang Grafik', range],
+            ['Pengelompokan', _modeName[data.mode] ?? data.mode],
+            ['Total Penjualan', total],
+            ['Jumlah Transaksi', count],
+            [],
+            ['Periode', 'Jumlah Transaksi', 'Penjualan Bersih'],
+            for (final b in data.buckets) [b.full, b.n, b.t],
+          ],
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Ekspor tren penjualan siap dibagikan')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal mengekspor: $e')));
+      }
+    }
+  }
+
+  Future<void> _exportSelected() async {
+    try {
+      final data = await fut;
+      if (mounted) await _export(data);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal memuat tren: $e')));
+      }
+    }
+  }
+
   Future<_ChartData> _load() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -954,6 +1081,15 @@ class _SalesBarChartState extends State<_SalesBarChart> {
                   .textTheme
                   .titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _exportSelected,
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: const Text('Ekspor Tren Excel'),
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 4, children: [
             for (final k in _chartRanges.keys)

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart' show ImageSource;
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'attendance_photo.dart';
 import 'db.dart';
+import 'excel_export.dart';
 import 'prefs.dart';
 import 'product_image.dart';
 import 'printer.dart';
@@ -29,6 +30,7 @@ class _HistoryPageState extends State<HistoryPage> {
   String _q = '';
   int _pcs = 0, _jajanTotal = 0; // ringkasan hasil pencarian
   int _seq = 0; // pencarian terbaru yang boleh mengisi ringkasan
+  bool _exporting = false;
 
   static String _iso(DateTime d) => d.toIso8601String().substring(0, 10);
 
@@ -133,6 +135,101 @@ class _HistoryPageState extends State<HistoryPage> {
       }
       return rows;
     })();
+  }
+
+  Future<void> _export() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      // Ambil ulang tanpa batas 1.000 baris agar ekspor mencakup seluruh data.
+      final w = <String>[];
+      final a = <Object?>[];
+      if (!Session.isAdmin) {
+        w.add('outlet=?');
+        a.add(Session.outlet);
+        final now = DateTime.now();
+        final cutoff = now.day >= 3
+            ? DateTime(now.year, now.month, 3)
+            : DateTime(now.year, now.month - 1, 3);
+        w.add('created_at >= ?');
+        a.add(cutoff.toIso8601String());
+      } else if (Scope.restricted ||
+          !AdminScope.isAll ||
+          AdminScope.groupId != 0) {
+        w.add(Scope.cond('outlet'));
+        a.addAll(Scope.args);
+      }
+      if (range != null) {
+        w.add('substr(created_at,1,10) BETWEEN ? AND ?');
+        a.add(_iso(range!.start));
+        a.add(_iso(range!.end));
+      }
+      final q = _q.trim().toLowerCase();
+      final jajanHit = q.isNotEmpty && 'jajan'.contains(q);
+      if (q.isNotEmpty) {
+        w.add(
+            "(code LIKE ? OR user_name LIKE ? OR id IN (SELECT trx_id FROM transaction_items WHERE product_name LIKE ? OR kemasan LIKE ?)${jajanHit ? ' OR jajan_qty>0' : ''})");
+        a.addAll(List.filled(4, '%$q%'));
+      }
+      await Db.ensureCols();
+      final rows = await Db.q(
+        'SELECT * FROM transactions ${w.isEmpty ? '' : 'WHERE ${w.join(' AND ')}'} ORDER BY created_at DESC',
+        a,
+      );
+      final fileDate = range == null
+          ? 'semua_tanggal'
+          : '${_iso(range!.start)}_${_iso(range!.end)}';
+      if (!mounted) return;
+      await shareExcel(
+        context: context,
+        title: 'Riwayat Transaksi',
+        fileName: 'riwayat_transaksi_$fileDate',
+        sheets: {
+          'Transaksi': [
+            [
+              'Kode',
+              'Tanggal dan Waktu',
+              'Kasir',
+              'Outlet',
+              'Subtotal',
+              'Diskon',
+              'Total',
+              'Pembayaran',
+              'Tunai Diterima',
+              'Kembalian',
+              'Jajan (pcs)',
+              'Nilai Jajan',
+            ],
+            for (final e in rows)
+              [
+                e['code'],
+                e['created_at'],
+                e['user_name'],
+                e['outlet'],
+                e['subtotal'],
+                e['discount_amt'],
+                trxMoney(e),
+                (e['payment'] ?? 'Tunai'),
+                e['cash'],
+                e['change_amt'],
+                jajanOf(e),
+                jajanOf(e) * kJajanPrice,
+              ],
+          ],
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Ekspor ${rows.length} transaksi siap dibagikan')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal mengekspor: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   Future<void> _detail(Rec h) async {
@@ -296,29 +393,44 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: TextField(
-            controller: _search,
-            onChanged: (v) => setState(() {
-              _q = v;
-              _load();
-            }),
-            decoration: InputDecoration(
-              hintText: 'Cari produk, jajan, kode, atau kasir',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _q.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => setState(() {
-                            _search.clear();
-                            _q = '';
-                            _load();
-                          })),
-              isDense: true,
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _search,
+                onChanged: (v) => setState(() {
+                  _q = v;
+                  _load();
+                }),
+                decoration: InputDecoration(
+                  hintText: 'Cari produk, jajan, kode, atau kasir',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _q.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setState(() {
+                                _search.clear();
+                                _q = '';
+                                _load();
+                              })),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: _exporting ? null : _export,
+              icon: _exporting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.file_download_outlined, size: 18),
+              label: const Text('Ekspor Excel'),
+            ),
+          ]),
         ),
         Expanded(
           child: FutureBuilder<List<Rec>>(
