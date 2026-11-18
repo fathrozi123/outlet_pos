@@ -1163,6 +1163,100 @@ class ReportTrend extends StatefulWidget {
 
 class _ReportTrendState extends State<ReportTrend> {
   String per = 'Bulanan';
+  bool _exporting = false;
+
+  Future<List<Rec>> _fetchRows(int len) async {
+    String t(Object? v) => (v ?? '').toString().trim();
+    String kem(Object? v) => noKem(t(v)) ? '' : t(v);
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    final sold = await Db.q(
+        "SELECT i.product_name n, i.kemasan k, SUM(i.qty) q FROM transaction_items i WHERE i.trx_id IN (SELECT id FROM transactions WHERE substr(created_at,1,$len)=?${Scope.and('outlet')}) AND i.product_name IN (SELECT name FROM products WHERE category='utama') GROUP BY i.product_name, i.kemasan",
+        [_now(len), ...Scope.args]);
+    final all = await Db.q(
+        "SELECT p.name n, v.kemasan k FROM variants v JOIN products p ON p.id=v.product_id WHERE p.category='utama'");
+    final m = <String, Rec>{};
+    Rec row(Rec e) => {'name': t(e['n']), 'kem': kem(e['k']), 'q': 0};
+    for (final e in all) {
+      m.putIfAbsent('${t(e['n'])}|${kem(e['k'])}', () => row(e));
+    }
+    for (final e in sold) {
+      final r = m.putIfAbsent('${t(e['n'])}|${kem(e['k'])}', () => row(e));
+      r['q'] = n(r['q']) + n(e['q']);
+    }
+    final List<Rec> list = m.values.toList()
+      ..sort((a, b) {
+        final c = n(b['q']).compareTo(n(a['q']));
+        return c != 0 ? c : t(a['name']).compareTo(t(b['name']));
+      });
+    return list;
+  }
+
+  Future<void> _exportExcel() async {
+    setState(() => _exporting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final len = _periods[per]!;
+      final o = AdminScope.value;
+      final rows = await _fetchRows(len);
+
+      // Label periode untuk info sheet
+      final periodeLabel = per == 'Harian'
+          ? 'Hari ini'
+          : per == 'Bulanan'
+              ? 'Bulan ini'
+              : 'Tahun ini';
+
+      // Baris data: satu baris per produk+kemasan, diurutkan qty desc
+      final dataRows = rows
+          .map((e) => [
+                '${e['name']}',
+                (e['kem'] as String).isEmpty ? '-' : '${e['kem']}',
+                e['q'] as int,
+              ])
+          .toList();
+
+      // Hitung total per kemasan untuk sheet ringkasan
+      final Map<String, int> totalPerKemasan = {};
+      for (final e in rows) {
+        final k = (e['kem'] as String).isEmpty ? 'Tanpa Kemasan' : '${e['kem']}';
+        totalPerKemasan[k] = (totalPerKemasan[k] ?? 0) + (e['q'] as int);
+      }
+      final grandTotal = rows.fold<int>(0, (a, e) => a + (e['q'] as int));
+
+      final perLabel = per.toLowerCase().replaceAll(' ', '_');
+      final outletLabel = o.isEmpty ? 'semua' : o.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
+
+      await shareExcel(
+        title: 'Tren Produk – $periodeLabel',
+        fileName: 'tren_produk_${perLabel}_$outletLabel',
+        sheets: {
+          'Tren Produk': [
+            ['Tren Produk', 'Nilai'],
+            ['Outlet', o.isEmpty ? 'Semua Outlet' : o],
+            ['Periode', periodeLabel],
+            ['Total Terjual', grandTotal],
+            [],
+            ['Produk', 'Kemasan', 'Qty Terjual (pcs)'],
+            ...dataRows,
+          ],
+          'Ringkasan Kemasan': [
+            ['Kemasan', 'Total Qty (pcs)'],
+            for (final e in totalPerKemasan.entries) [e.key, e.value],
+            [],
+            ['Grand Total', grandTotal],
+          ],
+        },
+      );
+
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Ekspor tren produk siap dibagikan')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Gagal mengekspor: $e')));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final len = _periods[per]!;
@@ -1173,36 +1267,25 @@ class _ReportTrendState extends State<ReportTrend> {
           'Tren Produk (${per == 'Harian' ? 'hari ini' : per == 'Bulanan' ? 'bulan ini' : 'tahun ini'})${o.isEmpty ? '' : ' • $o'}'),
       _PeriodBar(per, (v) => setState(() => per = v)),
       const SizedBox(height: 12),
+      // Tombol ekspor Excel
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: _exporting ? null : _exportExcel,
+          icon: _exporting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.file_download_outlined, size: 18),
+          label: Text(_exporting ? 'Mengekspor…' : 'Ekspor Excel'),
+        ),
+      ),
+      const SizedBox(height: 12),
       // Seluruh penjualan per produk per kemasan (mis. Pipa Besar 123,
       // Pipa Normal 223, Pipa Kecil 15). Kemasan yang belum terjual tampil 0.
       _Q(
-        (() async {
-          // Tanpa cast ke String: nilai null dari database dianggap kosong.
-          String t(Object? v) => (v ?? '').toString().trim();
-          String kem(Object? v) => noKem(t(v)) ? '' : t(v);
-          int n(Object? v) => v is num ? v.toInt() : 0;
-          final sold = await Db.q(
-              "SELECT i.product_name n, i.kemasan k, SUM(i.qty) q FROM transaction_items i WHERE i.trx_id IN (SELECT id FROM transactions WHERE substr(created_at,1,$len)=?${Scope.and('outlet')}) AND i.product_name IN (SELECT name FROM products WHERE category='utama') GROUP BY i.product_name, i.kemasan",
-              [_now(len), ...Scope.args]);
-          final all = await Db.q(
-              "SELECT p.name n, v.kemasan k FROM variants v JOIN products p ON p.id=v.product_id WHERE p.category='utama'");
-          final m = <String, Rec>{};
-          Rec row(Rec e) => {'name': t(e['n']), 'kem': kem(e['k']), 'q': 0};
-          for (final e in all) {
-            m.putIfAbsent('${t(e['n'])}|${kem(e['k'])}', () => row(e));
-          }
-          for (final e in sold) {
-            final r =
-                m.putIfAbsent('${t(e['n'])}|${kem(e['k'])}', () => row(e));
-            r['q'] = n(r['q']) + n(e['q']);
-          }
-          final List<Rec> list = m.values.toList()
-            ..sort((a, b) {
-              final c = n(b['q']).compareTo(n(a['q']));
-              return c != 0 ? c : t(a['name']).compareTo(t(b['name']));
-            });
-          return list;
-        })(),
+        _fetchRows(len),
         (rows) {
           if (rows.isEmpty) return const Text('Belum ada produk');
           int n(Object? v) => v is num ? v.toInt() : 0;

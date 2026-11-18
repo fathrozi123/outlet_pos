@@ -7,7 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 /// Membuat berkas Excel asli (.xlsx) lalu membuka menu berbagi perangkat.
 Future<void> shareExcel({
-  required BuildContext context,
+  BuildContext? context,
   required String title,
   required String fileName,
   required Map<String, List<List<Object?>>> sheets,
