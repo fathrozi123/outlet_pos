@@ -42,6 +42,17 @@ class _HistoryPageState extends State<HistoryPage> {
   static String _dm(DateTime d) =>
       _iso(d).substring(5).split('-').reversed.join('/');
 
+  static String _ddmmyyyy(DateTime d) =>
+      _iso(d).split('-').reversed.join('/');
+
+  /// created_at (ISO) → "dd/MM/yyyy HH:mm" untuk Excel.
+  static String _waktu(Object? v) {
+    final d = DateTime.tryParse('${v ?? ''}');
+    if (d == null) return '${v ?? ''}';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${_ddmmyyyy(d)} ${two(d.hour)}:${two(d.minute)}';
+  }
+
   String get _rangeLabel => range == null
       ? 'Semua tanggal'
       : _iso(range!.start) == _iso(range!.end)
@@ -184,39 +195,68 @@ class _HistoryPageState extends State<HistoryPage> {
         context: context,
         title: 'Riwayat Transaksi',
         fileName: 'riwayat_transaksi_$fileDate',
-        sheets: {
-          'Transaksi': [
-            [
-              'Kode',
-              'Tanggal dan Waktu',
-              'Kasir',
-              'Outlet',
-              'Subtotal',
-              'Diskon',
-              'Total',
-              'Pembayaran',
-              'Tunai Diterima',
-              'Kembalian',
-              'Jajan (pcs)',
-              'Nilai Jajan',
+        sheets: [
+          ExcelSheet(
+            name: 'Riwayat Transaksi',
+            title: 'Riwayat Transaksi',
+            outlet: excelOutlet(
+                Session.isAdmin ? AdminScope.value : Session.outlet),
+            period: range == null
+                ? 'Semua tanggal'
+                : '${_ddmmyyyy(range!.start)} - ${_ddmmyyyy(range!.end)}',
+            columns: const [
+              ExcelCol('Kode'),
+              ExcelCol('Tanggal & Waktu', width: 18),
+              ExcelCol('Kasir'),
+              ExcelCol('Outlet'),
+              ExcelCol('Pembayaran'),
+              ExcelCol.money('Subtotal'),
+              ExcelCol.money('Diskon'),
+              ExcelCol.money('Total Belanja'),
+              ExcelCol.number('Jajan (Pcs)'),
+              ExcelCol.money('Nilai Jajan'),
+              ExcelCol.money('Uang Masuk'),
+              ExcelCol.money('Tunai Diterima'),
+              ExcelCol.money('Kembalian'),
             ],
-            for (final e in rows)
-              [
-                e['code'],
-                e['created_at'],
-                e['user_name'],
-                e['outlet'],
-                e['subtotal'],
-                e['discount_amt'],
-                trxMoney(e),
-                (e['payment'] ?? 'Tunai'),
-                e['cash'],
-                e['change_amt'],
-                jajanOf(e),
-                jajanOf(e) * kJajanPrice,
-              ],
-          ],
-        },
+            // Uang Masuk = Total Belanja + Nilai Jajan (sama dengan angka
+            // di daftar riwayat), jadi kolom-kolomnya tidak dobel hitung.
+            rows: [
+              for (final e in rows)
+                [
+                  e['code'],
+                  _waktu(e['created_at']),
+                  e['user_name'],
+                  e['outlet'],
+                  (e['payment'] ?? 'Tunai'),
+                  e['subtotal'] ?? 0,
+                  e['discount_amt'] ?? 0,
+                  e['total'] ?? 0,
+                  jajanOf(e),
+                  jajanOf(e) * kJajanPrice,
+                  trxMoney(e),
+                  e['cash'] ?? 0,
+                  e['change_amt'] ?? 0,
+                ],
+            ],
+            total: [
+              'Total (${rows.length} transaksi)',
+              null,
+              null,
+              null,
+              null,
+              rows.fold<num>(0, (a, e) => a + ((e['subtotal'] ?? 0) as num)),
+              rows.fold<num>(
+                  0, (a, e) => a + ((e['discount_amt'] ?? 0) as num)),
+              rows.fold<num>(0, (a, e) => a + ((e['total'] ?? 0) as num)),
+              rows.fold<int>(0, (a, e) => a + jajanOf(e)),
+              rows.fold<int>(0, (a, e) => a + jajanOf(e) * kJajanPrice),
+              rows.fold<int>(0, (a, e) => a + trxMoney(e)),
+              null,
+              null,
+            ],
+          ),
+        ],
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

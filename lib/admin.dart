@@ -22,6 +22,21 @@ final _kBtnPutih = FilledButton.styleFrom(
 const _periods = {'Harian': 10, 'Bulanan': 7, 'Tahunan': 4};
 String _now(int len) => DateTime.now().toIso8601String().substring(0, len);
 
+/// Kunci periode dari SQL (yyyy-MM-dd / yyyy-MM / yyyy) → teks yang mudah dibaca.
+String _periodLabel(String p) {
+  const bln = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', //
+    'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  final s = p.split('-');
+  if (s.length == 3) return '${s[2]}/${s[1]}/${s[0]}';
+  if (s.length == 2) {
+    final m = int.tryParse(s[1]) ?? 0;
+    return m >= 1 && m <= 12 ? '${bln[m - 1]} ${s[0]}' : p;
+  }
+  return p;
+}
+
 Widget _title(BuildContext c, String t) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: Text(t, style: Theme.of(c).textTheme.titleLarge));
@@ -529,32 +544,56 @@ class _ReportSummaryState extends State<ReportSummary> {
       final rangeTxt =
           '${_fmt.format(range.start)} - ${_fmt.format(range.end)}';
       if (!mounted) return;
+      final o = excelOutlet(outlet);
+      // Angka pengurang ditulis negatif (sama seperti di layar "-Rp"), jadi
+      // Penjualan Kotor + Diskon = Total Pendapatan Kotor, dan seterusnya.
+      final trenN = periods.fold<int>(0, (a, e) => a + (e['n'] as num).toInt());
+      final trenT = periods.fold<num>(0, (a, e) => a + (e['t'] as num? ?? 0));
       await shareExcel(
         context: context,
         title: 'Ringkasan Penjualan',
         fileName: 'ringkasan_penjualan_${_iso(range.start)}_${_iso(range.end)}',
-        sheets: {
-          'Laporan Penjualan': [
-            ['Ringkasan Penjualan', 'Nilai'],
-            ['Outlet', outlet.isEmpty ? 'Semua Toko' : outlet],
-            ['Periode', rangeTxt],
-            ['Penjualan Kotor', kotor],
-            ['Diskon', diskon],
-            ['Total Pendapatan Kotor', bersih],
-            ['Modal', modal],
-            ['Beban', beban],
-            ['Total Pendapatan Bersih', pendapatan],
-            ['Jumlah Transaksi', count],
-            [
-              'Rata-rata per Transaksi',
-              count == 0 ? 0 : (bersih / count).round()
+        sheets: [
+          ExcelSheet(
+            name: 'Ringkasan Penjualan',
+            title: 'Ringkasan Penjualan',
+            outlet: o,
+            period: rangeTxt,
+            columns: const [
+              ExcelCol('Keterangan', width: 34),
+              ExcelCol.money('Nilai (Rp)', width: 22),
             ],
-          ],
-          'Tren Penjualan': [
-            ['Periode', 'Jumlah Transaksi', 'Penjualan Bersih'],
-            for (final e in periods) [e['p'], e['n'], e['t']],
-          ],
-        },
+            rows: [
+              ['Penjualan Kotor', kotor],
+              ['Diskon', -diskon],
+              ['Total Pendapatan Kotor', bersih],
+              ['Modal', -modal],
+              ['Beban', -beban],
+              ['Total Pendapatan Bersih', pendapatan],
+              ['Jumlah Transaksi', count],
+              [
+                'Rata-rata per Transaksi',
+                count == 0 ? 0 : (bersih / count).round()
+              ],
+            ],
+          ),
+          ExcelSheet(
+            name: 'Tren Penjualan',
+            title: 'Tren Penjualan ($per)',
+            outlet: o,
+            period: rangeTxt,
+            columns: const [
+              ExcelCol('Periode', width: 22),
+              ExcelCol.number('Jumlah Transaksi', width: 20),
+              ExcelCol.money('Penjualan (Rp)', width: 22),
+            ],
+            rows: [
+              for (final e in periods)
+                [_periodLabel('${e['p']}'), e['n'], e['t'] ?? 0],
+            ],
+            total: ['Total', trenN, trenT],
+          ),
+        ],
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -857,19 +896,24 @@ class _SalesBarChartState extends State<_SalesBarChart> {
         title: 'Tren Penjualan',
         fileName:
             'tren_penjualan_${range.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')}',
-        sheets: {
-          'Tren Penjualan': [
-            ['Tren Penjualan', 'Nilai'],
-            ['Outlet', widget.outlet.isEmpty ? 'Semua Toko' : widget.outlet],
-            ['Rentang Grafik', range],
-            ['Pengelompokan', _modeName[data.mode] ?? data.mode],
-            ['Total Penjualan', total],
-            ['Jumlah Transaksi', count],
-            [],
-            ['Periode', 'Jumlah Transaksi', 'Penjualan Bersih'],
-            for (final b in data.buckets) [b.full, b.n, b.t],
-          ],
-        },
+        sheets: [
+          ExcelSheet(
+            name: 'Tren Penjualan',
+            title: 'Tren Penjualan',
+            outlet: excelOutlet(widget.outlet),
+            period: data.buckets.isEmpty
+                ? 'Rentang $range'
+                : 'Rentang $range: ${data.buckets.first.full} s.d. '
+                    '${data.buckets.last.full} (per ${_modeName[data.mode] ?? data.mode})',
+            columns: const [
+              ExcelCol('Periode', width: 28),
+              ExcelCol.number('Jumlah Transaksi', width: 20),
+              ExcelCol.money('Penjualan (Rp)', width: 22),
+            ],
+            rows: [for (final b in data.buckets) [b.full, b.n, b.t]],
+            total: ['Total', count, total],
+          ),
+        ],
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -1199,12 +1243,12 @@ class _ReportTrendState extends State<ReportTrend> {
       final o = AdminScope.value;
       final rows = await _fetchRows(len);
 
-      // Label periode untuk info sheet
-      final periodeLabel = per == 'Harian'
-          ? 'Hari ini'
-          : per == 'Bulanan'
-              ? 'Bulan ini'
-              : 'Tahun ini';
+      // Periode yang sama persis dengan data di layar (hari/bulan/tahun ini),
+      // ditulis sebagai tanggal nyata agar file tetap jelas saat dibuka nanti.
+      final key = _now(len);
+      final periodeLabel =
+          '${per == 'Harian' ? 'Hari ini' : per == 'Bulanan' ? 'Bulan ini' : 'Tahun ini'}'
+          ' (${_periodLabel(key)})';
 
       // Baris data: satu baris per produk+kemasan, diurutkan qty desc
       final dataRows = rows
@@ -1215,37 +1259,50 @@ class _ReportTrendState extends State<ReportTrend> {
               ])
           .toList();
 
-      // Hitung total per kemasan untuk sheet ringkasan
+      // Hitung total per kemasan untuk sheet ringkasan (terbanyak di atas)
       final Map<String, int> totalPerKemasan = {};
       for (final e in rows) {
         final k = (e['kem'] as String).isEmpty ? 'Tanpa Kemasan' : '${e['kem']}';
         totalPerKemasan[k] = (totalPerKemasan[k] ?? 0) + (e['q'] as int);
       }
+      final kemRows = totalPerKemasan.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
       final grandTotal = rows.fold<int>(0, (a, e) => a + (e['q'] as int));
 
-      final perLabel = per.toLowerCase().replaceAll(' ', '_');
-      final outletLabel = o.isEmpty ? 'semua' : o.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
+      final outletLabel = o.isEmpty ? 'semua' : o;
 
+      if (!mounted) return;
       await shareExcel(
-        title: 'Tren Produk – $periodeLabel',
-        fileName: 'tren_produk_${perLabel}_$outletLabel',
-        sheets: {
-          'Tren Produk': [
-            ['Tren Produk', 'Nilai'],
-            ['Outlet', o.isEmpty ? 'Semua Outlet' : o],
-            ['Periode', periodeLabel],
-            ['Total Terjual', grandTotal],
-            [],
-            ['Produk', 'Kemasan', 'Qty Terjual (pcs)'],
-            ...dataRows,
-          ],
-          'Ringkasan Kemasan': [
-            ['Kemasan', 'Total Qty (pcs)'],
-            for (final e in totalPerKemasan.entries) [e.key, e.value],
-            [],
-            ['Grand Total', grandTotal],
-          ],
-        },
+        context: context,
+        title: 'Tren Produk - $periodeLabel',
+        fileName: 'tren_produk_${key}_$outletLabel',
+        sheets: [
+          ExcelSheet(
+            name: 'Tren Produk',
+            title: 'Penjualan per Produk',
+            outlet: excelOutlet(o),
+            period: periodeLabel,
+            columns: const [
+              ExcelCol('Nama Produk', width: 40),
+              ExcelCol('Kemasan', width: 18),
+              ExcelCol.number('Jumlah Terjual (Pcs)', width: 22),
+            ],
+            rows: dataRows,
+            total: ['Total', null, grandTotal],
+          ),
+          ExcelSheet(
+            name: 'Ringkasan Kemasan',
+            title: 'Penjualan per Kemasan',
+            outlet: excelOutlet(o),
+            period: periodeLabel,
+            columns: const [
+              ExcelCol('Kemasan', width: 28),
+              ExcelCol.number('Jumlah Terjual (Pcs)', width: 22),
+            ],
+            rows: [for (final e in kemRows) [e.key, e.value]],
+            total: ['Total', grandTotal],
+          ),
+        ],
       );
 
       messenger.showSnackBar(
